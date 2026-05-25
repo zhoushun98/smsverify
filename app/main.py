@@ -153,23 +153,26 @@ def create_app(
                 error=PUBLIC_ORDER_ERROR,
                 code=normalized,
             )
-        return RedirectResponse(f"/orders/{order['id']}", status_code=303)
+        return RedirectResponse(f"/orders/{order['public_token']}", status_code=303)
 
-    @app.get("/orders/{order_id}", response_class=HTMLResponse)
-    def order_page(request: Request, order_id: int):
-        order = order_repo.get(order_id)
+    @app.get("/orders/{order_token}", response_class=HTMLResponse)
+    def order_page(request: Request, order_token: str):
+        order = order_repo.get_by_public_token(order_token)
         if order is None:
             return render("redeem/not_found.html", request, status_code=404)
         return render("redeem/order.html", request, order=order)
 
-    @app.get("/orders/{order_id}/poll", response_class=HTMLResponse)
-    def order_poll(request: Request, order_id: int):
+    @app.get("/orders/{order_token}/poll", response_class=HTMLResponse)
+    def order_poll(request: Request, order_token: str):
+        order = order_repo.get_by_public_token(order_token)
+        if order is None:
+            return render("redeem/_order_status.html", request, status_code=404, order=None)
         try:
-            order = redeem_service.poll_sms(order_id)
+            order = redeem_service.poll_sms(order["id"])
         except OrderNotFoundError:
             return render("redeem/_order_status.html", request, status_code=404, order=None)
         except Exception:
-            order = order_repo.get(order_id)
+            order = order_repo.get_by_public_token(order_token)
             return render(
                 "redeem/_order_status.html",
                 request,

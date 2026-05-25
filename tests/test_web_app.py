@@ -1,3 +1,5 @@
+import re
+
 from fastapi.testclient import TestClient
 
 from app.main import create_app
@@ -15,6 +17,7 @@ class FakeSmsClient:
         }
 
     def get_number(self, *, country, project, number=None, wait_seconds=30):
+        self._order_count = getattr(self, "_order_count", 0) + 1
         self.requests.append(
             {
                 "country": country,
@@ -23,7 +26,7 @@ class FakeSmsClient:
                 "wait_seconds": wait_seconds,
             }
         )
-        return {"order_id": "9901", "phone": number}
+        return {"order_id": f"990{self._order_count}", "phone": number}
 
     def get_sms(self, *, order_id):
         return {"status": "received", "sms_code": "654321"}
@@ -89,6 +92,8 @@ def test_visitor_can_check_confirm_and_poll_cdk(tmp_path, monkeypatch):
     )
     assert confirm.status_code == 303
     order_url = confirm.headers["location"]
+    assert re.fullmatch(r"/orders/[A-Za-z0-9_-]{24,}", order_url)
+    assert order_url != "/orders/1"
     assert sms_client.requests[0]["number"] == "855386334567"
 
     order_page = client.get(order_url)
@@ -97,6 +102,37 @@ def test_visitor_can_check_confirm_and_poll_cdk(tmp_path, monkeypatch):
     poll = client.get(f"{order_url}/poll")
     assert poll.status_code == 200
     assert "654321" in poll.text
+
+
+def test_numeric_order_ids_are_not_public_urls(tmp_path, monkeypatch):
+    random_values = iter([234567, 345678])
+    monkeypatch.setattr(
+        "app.repositories.secrets.randbelow",
+        lambda upper_bound: next(random_values),
+    )
+    app = make_test_app(tmp_path, FakeSmsClient())
+    client = TestClient(app)
+
+    client.post("/admin/login", data={"username": "admin", "password": "secret"})
+    client.post("/admin/cdks/generate", data={"count": "2", "batch_name": "越权测试"})
+    first_code, second_code = client.get("/admin/cdks/export").text.strip().splitlines()
+
+    first_confirm = client.post(
+        "/redeem/confirm",
+        data={"code": first_code},
+        follow_redirects=False,
+    )
+    second_confirm = client.post(
+        "/redeem/confirm",
+        data={"code": second_code},
+        follow_redirects=False,
+    )
+
+    assert first_confirm.headers["location"] != second_confirm.headers["location"]
+    guessed = client.get("/orders/2")
+    assert guessed.status_code == 404
+    assert "+855386334567" not in guessed.text
+    assert "订单 #2" not in guessed.text
 
 
 def test_public_pages_do_not_expose_admin_entry(tmp_path):

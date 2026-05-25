@@ -19,6 +19,7 @@ create table if not exists cdks (
 
 create table if not exists orders (
     id integer primary key autoincrement,
+    public_token text unique,
     platform_order_id text unique,
     cdk_id integer not null references cdks(id),
     requested_number text,
@@ -56,6 +57,12 @@ def create_connection(database_path: str) -> sqlite3.Connection:
 
 def initialize_database(connection: sqlite3.Connection) -> None:
     connection.executescript(SCHEMA)
+    _add_column_if_missing(
+        connection,
+        table_name="orders",
+        column_name="public_token",
+        definition="public_token text",
+    )
     _add_column_if_missing(
         connection,
         table_name="orders",

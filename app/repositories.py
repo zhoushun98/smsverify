@@ -138,14 +138,20 @@ class OrderRepository:
         requested_number: str,
         expires_at: str,
     ) -> sqlite3.Row:
-        cursor = self.connection.execute(
-            """
-            insert into orders (cdk_id, requested_number, status, expires_at)
-            values (?, ?, 'pending_api', ?)
-            """,
-            (cdk_id, requested_number, expires_at),
-        )
-        return self.get(cursor.lastrowid)
+        for _ in range(5):
+            public_token = secrets.token_urlsafe(24)
+            try:
+                cursor = self.connection.execute(
+                    """
+                    insert into orders (public_token, cdk_id, requested_number, status, expires_at)
+                    values (?, ?, ?, 'pending_api', ?)
+                    """,
+                    (public_token, cdk_id, requested_number, expires_at),
+                )
+            except sqlite3.IntegrityError:
+                continue
+            return self.get(cursor.lastrowid)
+        raise RuntimeError("订单访问令牌生成失败")
 
     def attach_platform_order(
         self,
@@ -215,6 +221,12 @@ class OrderRepository:
         return self.connection.execute(
             "select * from orders where id = ?",
             (order_id,),
+        ).fetchone()
+
+    def get_by_public_token(self, public_token: str) -> sqlite3.Row | None:
+        return self.connection.execute(
+            "select * from orders where public_token = ?",
+            (public_token,),
         ).fetchone()
 
     def list_recent(self, *, limit: int = 100) -> list[sqlite3.Row]:
