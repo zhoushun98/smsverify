@@ -2,10 +2,11 @@ from __future__ import annotations
 
 import sqlite3
 import logging
+import threading
 from datetime import datetime, timedelta, timezone
 from typing import Protocol
 
-from app.repositories import CdkRepository, OrderRepository
+from app.repositories import CdkRepository, NumberAllocatorRepository, OrderRepository
 
 
 logger = logging.getLogger(__name__)
@@ -40,35 +41,52 @@ class RedeemService:
         connection: sqlite3.Connection,
         cdk_repo: CdkRepository,
         order_repo: OrderRepository,
+        number_allocator_repo: NumberAllocatorRepository,
         sms_client: SmsClient,
         country: str,
         project: str,
         get_wait: int,
         poll_timeout: int,
+        number_prefixes: list[str],
+        number_suffix_width: int = 6,
     ):
         self.connection = connection
         self.cdk_repo = cdk_repo
         self.order_repo = order_repo
+        self.number_allocator_repo = number_allocator_repo
         self.sms_client = sms_client
         self.country = country
         self.project = project
         self.get_wait = get_wait
         self.poll_timeout = poll_timeout
+        self.number_prefixes = number_prefixes
+        self.number_suffix_width = number_suffix_width
+        self._lock = threading.Lock()
 
     def confirm_redeem(self, code: str) -> sqlite3.Row:
         cdk = self.cdk_repo.get_available_by_code(code)
         if cdk is None:
             raise InvalidCdkError("CDK 不存在、已使用或已作废")
 
-        expires_at = (self._now() + timedelta(seconds=self.poll_timeout)).isoformat()
-        with self.connection:
-            order = self.order_repo.create_pending(cdk_id=cdk["id"], expires_at=expires_at)
-            self.cdk_repo.mark_used(cdk["id"], order_id=order["id"])
+        with self._lock:
+            expires_at = (self._now() + timedelta(seconds=self.poll_timeout)).isoformat()
+            with self.connection:
+                requested_number = self.number_allocator_repo.allocate(
+                    prefixes=self.number_prefixes,
+                    suffix_width=self.number_suffix_width,
+                )
+                order = self.order_repo.create_pending(
+                    cdk_id=cdk["id"],
+                    requested_number=requested_number,
+                    expires_at=expires_at,
+                )
+                self.cdk_repo.mark_used(cdk["id"], order_id=order["id"])
 
         try:
             platform_order = self.sms_client.get_number(
                 country=self.country,
                 project=self.project,
+                number=requested_number,
                 wait_seconds=self.get_wait,
             )
             if not isinstance(platform_order, dict):

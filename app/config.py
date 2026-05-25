@@ -9,6 +9,7 @@ from pathlib import Path
 class Settings:
     smsverify_token: str
     smsverify_base_url: str
+    number_prefixes: list[str]
     country: str
     project: str
     get_wait: int
@@ -24,6 +25,7 @@ class Settings:
         return cls(
             smsverify_token=os.environ.get("SMSVERIFY_TOKEN", ""),
             smsverify_base_url=os.environ.get("SMSVERIFY_BASE_URL", ""),
+            number_prefixes=parse_number_prefixes(os.environ.get("SMSVERIFY_NUMBER_PREFIXES", "")),
             country=os.environ.get("SMSVERIFY_COUNTRY", "kh"),
             project=os.environ.get("SMSVERIFY_PROJECT", "chatgpt"),
             get_wait=int(os.environ.get("SMSVERIFY_GET_WAIT", "30")),
@@ -34,3 +36,7 @@ class Settings:
             admin_password=os.environ.get("ADMIN_PASSWORD", ""),
             session_secret=os.environ.get("SESSION_SECRET", "change-me"),
         )
+
+
+def parse_number_prefixes(raw: str) -> list[str]:
+    return [part.strip() for part in raw.split(",") if part.strip()]

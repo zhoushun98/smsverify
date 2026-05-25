@@ -131,13 +131,19 @@ class OrderRepository:
     def __init__(self, connection: sqlite3.Connection):
         self.connection = connection
 
-    def create_pending(self, *, cdk_id: int, expires_at: str) -> sqlite3.Row:
+    def create_pending(
+        self,
+        *,
+        cdk_id: int,
+        requested_number: str,
+        expires_at: str,
+    ) -> sqlite3.Row:
         cursor = self.connection.execute(
             """
-            insert into orders (cdk_id, status, expires_at)
-            values (?, 'pending_api', ?)
+            insert into orders (cdk_id, requested_number, status, expires_at)
+            values (?, ?, 'pending_api', ?)
             """,
-            (cdk_id, expires_at),
+            (cdk_id, requested_number, expires_at),
         )
         return self.get(cursor.lastrowid)
 
@@ -232,3 +238,31 @@ class OrderRepository:
         }
         counts.update({row["status"]: row["total"] for row in rows})
         return counts
+
+
+class NumberAllocatorRepository:
+    def __init__(self, connection: sqlite3.Connection):
+        self.connection = connection
+
+    def allocate(self, *, prefixes: list[str], suffix_width: int = 6) -> str:
+        clean_prefixes = [prefix.strip() for prefix in prefixes if prefix.strip()]
+        if not clean_prefixes:
+            raise RuntimeError("未配置可用号段")
+        invalid_prefixes = [prefix for prefix in clean_prefixes if not prefix.isdigit()]
+        if invalid_prefixes:
+            raise RuntimeError("号段只能包含数字")
+
+        row = self.connection.execute(
+            "select next_index from number_allocator_state where id = 1"
+        ).fetchone()
+        next_index = int(row["next_index"] if row else 0)
+        prefix = clean_prefixes[next_index % len(clean_prefixes)]
+        suffix_number = next_index // len(clean_prefixes) + 1
+        if suffix_number > (10**suffix_width) - 1:
+            raise RuntimeError("号段号码池已用尽")
+
+        self.connection.execute(
+            "update number_allocator_state set next_index = ? where id = 1",
+            (next_index + 1,),
+        )
+        return prefix + str(suffix_number).zfill(suffix_width)

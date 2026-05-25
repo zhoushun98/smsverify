@@ -4,6 +4,9 @@ from app.main import create_app
 
 
 class FakeSmsClient:
+    def __init__(self):
+        self.requests: list[dict] = []
+
     def balance(self):
         return {
             "available_balance": "10.00",
@@ -12,7 +15,15 @@ class FakeSmsClient:
         }
 
     def get_number(self, *, country, project, number=None, wait_seconds=30):
-        return {"order_id": "9901", "phone": "855386654321"}
+        self.requests.append(
+            {
+                "country": country,
+                "project": project,
+                "number": number,
+                "wait_seconds": wait_seconds,
+            }
+        )
+        return {"order_id": "9901", "phone": number}
 
     def get_sms(self, *, order_id):
         return {"status": "received", "sms_code": "654321"}
@@ -31,14 +42,20 @@ class SensitivePollFailureSmsClient(FakeSmsClient):
         raise RuntimeError("https://smsverify.online/api/get_sms token=secret")
 
 
-def test_visitor_can_check_confirm_and_poll_cdk(tmp_path):
-    app = create_app(
+def make_test_app(tmp_path, sms_client):
+    return create_app(
         database_path=str(tmp_path / "app.db"),
-        sms_client=FakeSmsClient(),
+        sms_client=sms_client,
         admin_username="admin",
         admin_password="secret",
         session_secret="test-secret",
+        number_prefixes=["855386"],
     )
+
+
+def test_visitor_can_check_confirm_and_poll_cdk(tmp_path):
+    sms_client = FakeSmsClient()
+    app = make_test_app(tmp_path, sms_client)
     client = TestClient(app)
 
     login = client.post(
@@ -71,9 +88,10 @@ def test_visitor_can_check_confirm_and_poll_cdk(tmp_path):
     )
     assert confirm.status_code == 303
     order_url = confirm.headers["location"]
+    assert sms_client.requests[0]["number"] == "855386000001"
 
     order_page = client.get(order_url)
-    assert "+855386654321" in order_page.text
+    assert "+855386000001" in order_page.text
 
     poll = client.get(f"{order_url}/poll")
     assert poll.status_code == 200
@@ -81,13 +99,7 @@ def test_visitor_can_check_confirm_and_poll_cdk(tmp_path):
 
 
 def test_public_pages_do_not_expose_admin_entry(tmp_path):
-    app = create_app(
-        database_path=str(tmp_path / "app.db"),
-        sms_client=FakeSmsClient(),
-        admin_username="admin",
-        admin_password="secret",
-        session_secret="test-secret",
-    )
+    app = make_test_app(tmp_path, FakeSmsClient())
     client = TestClient(app)
 
     response = client.get("/")
@@ -98,13 +110,7 @@ def test_public_pages_do_not_expose_admin_entry(tmp_path):
 
 
 def test_visitor_order_page_does_not_expose_platform_order_id(tmp_path):
-    app = create_app(
-        database_path=str(tmp_path / "app.db"),
-        sms_client=FakeSmsClient(),
-        admin_username="admin",
-        admin_password="secret",
-        session_secret="test-secret",
-    )
+    app = make_test_app(tmp_path, FakeSmsClient())
     client = TestClient(app)
 
     client.post("/admin/login", data={"username": "admin", "password": "secret"})
@@ -122,13 +128,7 @@ def test_visitor_order_page_does_not_expose_platform_order_id(tmp_path):
 
 
 def test_visitor_order_failure_is_sanitized(tmp_path):
-    app = create_app(
-        database_path=str(tmp_path / "app.db"),
-        sms_client=SensitiveFailureSmsClient(),
-        admin_username="admin",
-        admin_password="secret",
-        session_secret="test-secret",
-    )
+    app = make_test_app(tmp_path, SensitiveFailureSmsClient())
     client = TestClient(app)
 
     client.post("/admin/login", data={"username": "admin", "password": "secret"})
@@ -144,13 +144,7 @@ def test_visitor_order_failure_is_sanitized(tmp_path):
 
 
 def test_poll_failure_is_sanitized_for_visitor(tmp_path):
-    app = create_app(
-        database_path=str(tmp_path / "app.db"),
-        sms_client=SensitivePollFailureSmsClient(),
-        admin_username="admin",
-        admin_password="secret",
-        session_secret="test-secret",
-    )
+    app = make_test_app(tmp_path, SensitivePollFailureSmsClient())
     client = TestClient(app)
 
     client.post("/admin/login", data={"username": "admin", "password": "secret"})
@@ -172,13 +166,7 @@ def test_poll_failure_is_sanitized_for_visitor(tmp_path):
 
 
 def test_admin_login_rejects_wrong_password(tmp_path):
-    app = create_app(
-        database_path=str(tmp_path / "app.db"),
-        sms_client=FakeSmsClient(),
-        admin_username="admin",
-        admin_password="secret",
-        session_secret="test-secret",
-    )
+    app = make_test_app(tmp_path, FakeSmsClient())
     client = TestClient(app)
 
     response = client.post(

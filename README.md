@@ -1,6 +1,6 @@
 # CDK 接码兑换网站
 
-这是基于 `buy_sms.py` 改造的轻量 Web 版本。游客输入 CDK 后先确认服务，确认后下单并等待验证码；管理员可以登录后台批量生成、导出、作废 CDK，并查看订单状态。
+这是一个轻量 Web 版 CDK 接码兑换系统。游客输入 CDK 后先确认服务，确认后下单并等待验证码；管理员可以登录后台批量生成、导出、作废 CDK，并查看订单状态。
 
 ## 环境变量
 
@@ -8,6 +8,8 @@
 
 ```bash
 export SMSVERIFY_TOKEN="你的平台 API Token"
+export SMSVERIFY_BASE_URL="你的平台 API 地址"
+export SMSVERIFY_NUMBER_PREFIXES="855386,855387,855388"
 export ADMIN_PASSWORD="后台密码"
 export SESSION_SECRET="随机长字符串"
 ```
@@ -43,6 +45,7 @@ uv run uvicorn app.main:app --reload
 ```bash
 SMSVERIFY_TOKEN=你的平台 API Token
 SMSVERIFY_BASE_URL=你的平台 API 地址
+SMSVERIFY_NUMBER_PREFIXES=855386,855387,855388
 ADMIN_PASSWORD=后台密码
 SESSION_SECRET=随机长字符串
 ```

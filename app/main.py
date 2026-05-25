@@ -9,7 +9,12 @@ from fastapi.templating import Jinja2Templates
 
 from app.config import Settings
 from app.db import create_connection, initialize_database
-from app.repositories import CdkRepository, OrderRepository, normalize_cdk
+from app.repositories import (
+    CdkRepository,
+    NumberAllocatorRepository,
+    OrderRepository,
+    normalize_cdk,
+)
 from app.security import SessionManager, credentials_match
 from app.services.redeem import InvalidCdkError, OrderNotFoundError, RedeemService
 from app.services.smsverify import SmsverifyClient
@@ -46,6 +51,7 @@ def create_app(
     admin_username: str | None = None,
     admin_password: str | None = None,
     session_secret: str | None = None,
+    number_prefixes: list[str] | None = None,
 ) -> FastAPI:
     settings = Settings.from_env()
     resolved_database = database_path or settings.database_path
@@ -70,15 +76,18 @@ def create_app(
 
     cdk_repo = CdkRepository(connection)
     order_repo = OrderRepository(connection)
+    number_allocator_repo = NumberAllocatorRepository(connection)
     redeem_service = RedeemService(
         connection=connection,
         cdk_repo=cdk_repo,
         order_repo=order_repo,
+        number_allocator_repo=number_allocator_repo,
         sms_client=resolved_sms_client,
         country=settings.country,
         project=settings.project,
         get_wait=settings.get_wait,
         poll_timeout=settings.poll_timeout,
+        number_prefixes=number_prefixes if number_prefixes is not None else settings.number_prefixes,
     )
     sessions = SessionManager(resolved_session_secret)
 

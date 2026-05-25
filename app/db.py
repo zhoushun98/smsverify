@@ -21,6 +21,7 @@ create table if not exists orders (
     id integer primary key autoincrement,
     platform_order_id text unique,
     cdk_id integer not null references cdks(id),
+    requested_number text,
     phone text,
     sms_code text,
     status text not null
@@ -34,6 +35,13 @@ create table if not exists orders (
 create index if not exists idx_cdks_status on cdks(status);
 create index if not exists idx_orders_status on orders(status);
 create index if not exists idx_orders_cdk_id on orders(cdk_id);
+
+create table if not exists number_allocator_state (
+    id integer primary key check (id = 1),
+    next_index integer not null default 0
+);
+
+insert or ignore into number_allocator_state (id, next_index) values (1, 0);
 """
 
 
@@ -48,5 +56,25 @@ def create_connection(database_path: str) -> sqlite3.Connection:
 
 def initialize_database(connection: sqlite3.Connection) -> None:
     connection.executescript(SCHEMA)
+    _add_column_if_missing(
+        connection,
+        table_name="orders",
+        column_name="requested_number",
+        definition="requested_number text",
+    )
     connection.commit()
 
+
+def _add_column_if_missing(
+    connection: sqlite3.Connection,
+    *,
+    table_name: str,
+    column_name: str,
+    definition: str,
+) -> None:
+    columns = {
+        row["name"]
+        for row in connection.execute(f"pragma table_info({table_name})").fetchall()
+    }
+    if column_name not in columns:
+        connection.execute(f"alter table {table_name} add column {definition}")

@@ -13,6 +13,7 @@ def test_docker_compose_uses_env_and_persistent_data_volume():
     assert "ADMIN_PASSWORD: ${ADMIN_PASSWORD:?请配置 ADMIN_PASSWORD}" in compose
     assert "SESSION_SECRET: ${SESSION_SECRET:?请配置 SESSION_SECRET}" in compose
     assert "SMSVERIFY_BASE_URL: ${SMSVERIFY_BASE_URL:?请配置 SMSVERIFY_BASE_URL}" in compose
+    assert "SMSVERIFY_NUMBER_PREFIXES: ${SMSVERIFY_NUMBER_PREFIXES:?请配置 SMSVERIFY_NUMBER_PREFIXES}" in compose
     assert "SMSVERIFY_DATABASE: /app/data/smsverify.db" in compose
     assert "smsverify-data:/app/data" in compose
     assert "smsverify-data:" in compose
@@ -50,3 +51,14 @@ def test_public_repo_files_do_not_expose_real_provider_host():
         for file_path in files:
             if file_path.is_file() and "__pycache__" not in file_path.parts:
                 assert "smsverify.online" not in file_path.read_text(encoding="utf-8")
+
+
+def test_public_repo_files_do_not_reference_original_script():
+    scanned_files = [
+        ROOT / "README.md",
+        ROOT / "Dockerfile",
+        ROOT / "docker-compose.yml",
+    ]
+
+    for file_path in scanned_files:
+        assert "buy_sms.py" not in file_path.read_text(encoding="utf-8")
