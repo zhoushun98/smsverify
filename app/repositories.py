@@ -257,12 +257,24 @@ class NumberAllocatorRepository:
         ).fetchone()
         next_index = int(row["next_index"] if row else 0)
         prefix = clean_prefixes[next_index % len(clean_prefixes)]
-        suffix_number = next_index // len(clean_prefixes) + 1
-        if suffix_number > (10**suffix_width) - 1:
-            raise RuntimeError("号段号码池已用尽")
+        candidate = self._new_random_number(prefix=prefix, suffix_width=suffix_width)
 
         self.connection.execute(
             "update number_allocator_state set next_index = ? where id = 1",
             (next_index + 1,),
         )
-        return prefix + str(suffix_number).zfill(suffix_width)
+        return candidate
+
+    def _new_random_number(self, *, prefix: str, suffix_width: int) -> str:
+        lower_bound = 10 ** (suffix_width - 1)
+        upper_bound = 10**suffix_width
+        for _ in range(100):
+            suffix_number = secrets.randbelow(upper_bound - lower_bound) + lower_bound
+            candidate = prefix + str(suffix_number)
+            exists = self.connection.execute(
+                "select 1 from orders where requested_number = ? limit 1",
+                (candidate,),
+            ).fetchone()
+            if exists is None:
+                return candidate
+        raise RuntimeError("号段号码池随机分配失败，请稍后重试")

@@ -13,6 +13,7 @@ class FakeSmsClient:
     requests: list[dict] | None = None
 
     def get_number(self, *, country, project, number=None, wait_seconds=30):
+        self._order_count = getattr(self, "_order_count", 0) + 1
         if self.requests is not None:
             self.requests.append(
                 {
@@ -24,7 +25,7 @@ class FakeSmsClient:
             )
         if self.should_fail:
             raise RuntimeError("平台下单失败")
-        return {"order_id": f"880{len(self.requests or [])}", "phone": number or "random"}
+        return {"order_id": f"880{self._order_count}", "phone": number or "random"}
 
     def get_sms(self, *, order_id):
         return {"status": "received", "sms_code": "123456"}
@@ -63,21 +64,27 @@ def make_service(
     )
 
 
-def test_confirm_redeem_consumes_cdk_and_creates_waiting_order(connection):
+def test_confirm_redeem_consumes_cdk_and_creates_waiting_order(connection, monkeypatch):
+    monkeypatch.setattr("app.repositories.secrets.randbelow", lambda upper_bound: 234567)
     cdk_repo = CdkRepository(connection)
     [code] = cdk_repo.generate_batch(count=1, batch_name="兑换")
     service = make_service(connection, FakeSmsClient())
 
     order = service.confirm_redeem(code)
 
-    assert order["platform_order_id"] == "8800"
-    assert order["phone"] == "855386000001"
+    assert order["platform_order_id"] == "8801"
+    assert order["phone"] == "855386334567"
     assert order["status"] == "waiting_sms"
-    assert order["requested_number"] == "855386000001"
+    assert order["requested_number"] == "855386334567"
     assert cdk_repo.get_available_by_code(code) is None
 
 
-def test_confirm_redeem_sends_system_allocated_numbers_in_rotation(connection):
+def test_confirm_redeem_sends_system_allocated_random_numbers_in_rotation(connection, monkeypatch):
+    random_values = iter([1, 2, 3])
+    monkeypatch.setattr(
+        "app.repositories.secrets.randbelow",
+        lambda upper_bound: next(random_values),
+    )
     cdk_repo = CdkRepository(connection)
     codes = cdk_repo.generate_batch(count=3, batch_name="系统号段")
     requests: list[dict] = []
@@ -91,10 +98,28 @@ def test_confirm_redeem_sends_system_allocated_numbers_in_rotation(connection):
         service.confirm_redeem(code)
 
     assert [request["number"] for request in requests] == [
-        "855386000001",
-        "855387000001",
-        "855386000002",
+        "855386100001",
+        "855387100002",
+        "855386100003",
     ]
+
+
+def test_allocator_skips_duplicate_random_numbers(connection, monkeypatch):
+    random_values = iter([111111, 111111, 222222])
+    monkeypatch.setattr(
+        "app.repositories.secrets.randbelow",
+        lambda upper_bound: next(random_values),
+    )
+    cdk_repo = CdkRepository(connection)
+    first_code, second_code = cdk_repo.generate_batch(count=2, batch_name="去重")
+    service = make_service(connection, FakeSmsClient(), number_prefixes=["855386"])
+
+    first_order = service.confirm_redeem(first_code)
+    second_order = service.confirm_redeem(second_code)
+
+    assert first_order["requested_number"] == "855386211111"
+    assert second_order["requested_number"] == "855386322222"
+    assert first_order["requested_number"] != second_order["requested_number"]
 
 
 def test_confirm_redeem_requires_system_number_prefixes(connection):

@@ -53,7 +53,8 @@ def make_test_app(tmp_path, sms_client):
     )
 
 
-def test_visitor_can_check_confirm_and_poll_cdk(tmp_path):
+def test_visitor_can_check_confirm_and_poll_cdk(tmp_path, monkeypatch):
+    monkeypatch.setattr("app.repositories.secrets.randbelow", lambda upper_bound: 234567)
     sms_client = FakeSmsClient()
     app = make_test_app(tmp_path, sms_client)
     client = TestClient(app)
@@ -88,10 +89,10 @@ def test_visitor_can_check_confirm_and_poll_cdk(tmp_path):
     )
     assert confirm.status_code == 303
     order_url = confirm.headers["location"]
-    assert sms_client.requests[0]["number"] == "855386000001"
+    assert sms_client.requests[0]["number"] == "855386334567"
 
     order_page = client.get(order_url)
-    assert "+855386000001" in order_page.text
+    assert "+855386334567" in order_page.text
 
     poll = client.get(f"{order_url}/poll")
     assert poll.status_code == 200
