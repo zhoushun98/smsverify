@@ -1,0 +1,22 @@
+<div id="order-status" class="status-block status-{{ order.status if order else 'missing' }}">
+  {% if not order %}
+    <p class="alert error">订单不存在</p>
+  {% elif transient_error %}
+    <p class="status-title">等待验证码</p>
+    <p class="alert warning">{{ transient_error }}</p>
+  {% elif order.status == "completed" %}
+    <p class="status-title">收到验证码</p>
+    <p class="sms-code">{{ order.sms_code }}</p>
+  {% elif order.status == "waiting_sms" %}
+    <p class="status-title">等待验证码</p>
+    <p class="muted">页面会自动刷新状态。</p>
+  {% elif order.status == "manual_review" %}
+    <p class="status-title">待人工处理</p>
+    <p class="alert warning">{{ order.error_message }}</p>
+  {% elif order.status == "failed" %}
+    <p class="status-title">下单失败</p>
+    <p class="alert error">{{ order.error_message }}</p>
+  {% else %}
+    <p class="status-title">正在下单</p>
+  {% endif %}
+</div>

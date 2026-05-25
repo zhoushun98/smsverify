@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{{ title or "CDK 接码兑换" }}</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <script src="/static/poll.js" defer></script>
+  </head>
+  <body>
+    <header class="topbar">
+      <a class="brand" href="/">CDK 接码兑换</a>
+      <nav class="nav">
+        <a href="/">兑换</a>
+        {% if admin_view %}
+        <a href="/admin">后台</a>
+        {% endif %}
+      </nav>
+    </header>
+    <main class="container">
+      {% block content %}{% endblock %}
+    </main>
+  </body>
+</html>

@@ -1,0 +1,35 @@
+services:
+  smsverify-web:
+    build: .
+    container_name: smsverify-web
+    restart: unless-stopped
+    ports:
+      - "${APP_PORT:-8000}:8000"
+    environment:
+      SMSVERIFY_TOKEN: ${SMSVERIFY_TOKEN:?请配置 SMSVERIFY_TOKEN}
+      SMSVERIFY_BASE_URL: ${SMSVERIFY_BASE_URL:?请配置 SMSVERIFY_BASE_URL}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:?请配置 ADMIN_PASSWORD}
+      SESSION_SECRET: ${SESSION_SECRET:?请配置 SESSION_SECRET}
+      ADMIN_USERNAME: ${ADMIN_USERNAME:-admin}
+      SMSVERIFY_COUNTRY: ${SMSVERIFY_COUNTRY:-kh}
+      SMSVERIFY_PROJECT: ${SMSVERIFY_PROJECT:-chatgpt}
+      SMSVERIFY_DATABASE: /app/data/smsverify.db
+      SMSVERIFY_GET_WAIT: ${SMSVERIFY_GET_WAIT:-30}
+      SMSVERIFY_POLL_INTERVAL: ${SMSVERIFY_POLL_INTERVAL:-5}
+      SMSVERIFY_POLL_TIMEOUT: ${SMSVERIFY_POLL_TIMEOUT:-300}
+    volumes:
+      - ./data:/app/data
+    healthcheck:
+      test:
+        - CMD
+        - uv
+        - run
+        - --frozen
+        - --no-dev
+        - python
+        - -c
+        - "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/', timeout=5).read()"
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s

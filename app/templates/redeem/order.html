@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="panel order-panel">
+  <h1>订单 #{{ order.id }}</h1>
+  <dl class="details">
+    <div>
+      <dt>手机号</dt>
+      <dd>+{{ order.phone }}</dd>
+    </div>
+  </dl>
+  <div
+    id="order-status"
+    data-poll-url="/orders/{{ order.id }}/poll"
+    data-poll-interval="{{ poll_interval }}"
+  >
+    {% include "redeem/_order_status.html" %}
+  </div>
+</section>
+{% endblock %}

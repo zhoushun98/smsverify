@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="panel narrow">
+  <h1>确认兑换</h1>
+  <dl class="details">
+    <div>
+      <dt>服务</dt>
+      <dd>{{ project }}</dd>
+    </div>
+    <div>
+      <dt>国家</dt>
+      <dd>{{ country }}</dd>
+    </div>
+    <div>
+      <dt>CDK</dt>
+      <dd>{{ code }}</dd>
+    </div>
+  </dl>
+  <form method="post" action="/redeem/confirm" class="actions">
+    <input type="hidden" name="code" value="{{ code }}">
+    <a class="button secondary" href="/">返回</a>
+    <button type="submit">确认兑换</button>
+  </form>
+</section>
+{% endblock %}

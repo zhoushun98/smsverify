@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="toolbar">
+  <h1>订单列表</h1>
+  <a class="button secondary" href="/admin">返回后台</a>
+</section>
+
+<section class="metrics">
+  {% for status, total in order_counts.items() %}
+  <article>
+    <span>{{ status }}</span>
+    <strong>{{ total }}</strong>
+  </article>
+  {% endfor %}
+</section>
+
+<section class="panel">
+  <table>
+    <thead>
+      <tr>
+        <th>ID</th>
+        <th>平台订单</th>
+        <th>手机号</th>
+        <th>验证码</th>
+        <th>状态</th>
+        <th>错误</th>
+        <th>更新时间</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for order in orders %}
+      <tr>
+        <td>{{ order.id }}</td>
+        <td>{{ order.platform_order_id or "-" }}</td>
+        <td>{{ order.phone or "-" }}</td>
+        <td>{{ order.sms_code or "-" }}</td>
+        <td>{{ order.status }}</td>
+        <td>{{ order.error_message or "" }}</td>
+        <td>{{ order.updated_at }}</td>
+      </tr>
+      {% else %}
+      <tr><td colspan="7" class="muted">暂无订单</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</section>
+{% endblock %}

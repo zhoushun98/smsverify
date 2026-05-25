@@ -1,0 +1,87 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="toolbar">
+  <h1>管理后台</h1>
+  <form method="post" action="/admin/logout">
+    <button class="secondary" type="submit">退出</button>
+  </form>
+</section>
+
+<section class="metrics">
+  <article>
+    <span>可用 CDK</span>
+    <strong>{{ cdk_counts.available }}</strong>
+  </article>
+  <article>
+    <span>已使用</span>
+    <strong>{{ cdk_counts.used }}</strong>
+  </article>
+  <article>
+    <span>待短信</span>
+    <strong>{{ order_counts.waiting_sms }}</strong>
+  </article>
+  <article>
+    <span>待处理</span>
+    <strong>{{ order_counts.manual_review }}</strong>
+  </article>
+</section>
+
+<section class="grid">
+  <div class="panel">
+    <h2>生成 CDK</h2>
+    <form method="post" action="/admin/cdks/generate" class="stack">
+      <label for="count">数量</label>
+      <input id="count" name="count" type="number" min="1" max="1000" value="10" required>
+      <label for="batch_name">批次</label>
+      <input id="batch_name" name="batch_name" placeholder="例如 2026-05 首批">
+      <button type="submit">生成</button>
+    </form>
+    <a class="button secondary full" href="/admin/cdks/export">导出未使用 CDK</a>
+  </div>
+
+  <div class="panel">
+    <h2>平台余额</h2>
+    {% if balance %}
+      <p class="balance">{{ balance.available_balance }} {{ balance.currency }}</p>
+      <p class="muted">已锁定 {{ balance.reserved_balance }}</p>
+    {% else %}
+      <p class="alert warning">{{ balance_error }}</p>
+    {% endif %}
+    <a class="button secondary full" href="/admin/orders">查看订单</a>
+  </div>
+</section>
+
+<section class="panel">
+  <h2>最近 CDK</h2>
+  <table>
+    <thead>
+      <tr>
+        <th>CDK</th>
+        <th>状态</th>
+        <th>批次</th>
+        <th>创建时间</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for cdk in recent_cdks %}
+      <tr>
+        <td><code>{{ cdk.code }}</code></td>
+        <td>{{ cdk.status }}</td>
+        <td>{{ cdk.batch_name }}</td>
+        <td>{{ cdk.created_at }}</td>
+        <td>
+          {% if cdk.status == "available" %}
+          <form method="post" action="/admin/cdks/{{ cdk.id }}/revoke">
+            <button class="secondary small" type="submit">作废</button>
+          </form>
+          {% endif %}
+        </td>
+      </tr>
+      {% else %}
+      <tr><td colspan="5" class="muted">暂无数据</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</section>
+{% endblock %}
