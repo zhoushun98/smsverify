@@ -18,7 +18,7 @@ services:
       SMSVERIFY_POLL_INTERVAL: ${SMSVERIFY_POLL_INTERVAL:-5}
       SMSVERIFY_POLL_TIMEOUT: ${SMSVERIFY_POLL_TIMEOUT:-300}
     volumes:
-      - ./data:/app/data
+      - smsverify-data:/app/data
     healthcheck:
       test:
         - CMD
@@ -33,3 +33,6 @@ services:
       timeout: 10s
       retries: 3
       start_period: 20s
+
+volumes:
+  smsverify-data:

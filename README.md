@@ -65,7 +65,7 @@ docker compose logs -f smsverify-web
 docker compose down
 ```
 
-SQLite 数据保存在宿主机 `./data/smsverify.db`，容器重建不会丢失。
+SQLite 数据保存在 Docker 命名卷 `smsverify-data`，容器重建不会丢失。
 
 ## 测试
 

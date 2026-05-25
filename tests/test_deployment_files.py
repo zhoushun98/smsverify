@@ -14,7 +14,9 @@ def test_docker_compose_uses_env_and_persistent_data_volume():
     assert "SESSION_SECRET: ${SESSION_SECRET:?请配置 SESSION_SECRET}" in compose
     assert "SMSVERIFY_BASE_URL: ${SMSVERIFY_BASE_URL:?请配置 SMSVERIFY_BASE_URL}" in compose
     assert "SMSVERIFY_DATABASE: /app/data/smsverify.db" in compose
-    assert "./data:/app/data" in compose
+    assert "smsverify-data:/app/data" in compose
+    assert "smsverify-data:" in compose
+    assert "./data:/app/data" not in compose
     assert "dev-token" not in compose
     assert "dev-secret" not in compose
 
