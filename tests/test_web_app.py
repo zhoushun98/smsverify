@@ -135,6 +135,48 @@ def test_numeric_order_ids_are_not_public_urls(tmp_path, monkeypatch):
     assert "订单 #2" not in guessed.text
 
 
+def test_order_url_is_bound_to_redeeming_browser(tmp_path, monkeypatch):
+    random_values = iter([234567, 345678])
+    monkeypatch.setattr(
+        "app.repositories.secrets.randbelow",
+        lambda upper_bound: next(random_values),
+    )
+    app = make_test_app(tmp_path, FakeSmsClient())
+    admin_client = TestClient(app)
+
+    admin_client.post("/admin/login", data={"username": "admin", "password": "secret"})
+    admin_client.post("/admin/cdks/generate", data={"count": "2", "batch_name": "浏览器绑定"})
+    first_code, second_code = admin_client.get("/admin/cdks/export").text.strip().splitlines()
+
+    first_browser = TestClient(app)
+    second_browser = TestClient(app)
+
+    first_confirm = first_browser.post(
+        "/redeem/confirm",
+        data={"code": first_code},
+        follow_redirects=False,
+    )
+    second_confirm = second_browser.post(
+        "/redeem/confirm",
+        data={"code": second_code},
+        follow_redirects=False,
+    )
+    first_url = first_confirm.headers["location"]
+    second_url = second_confirm.headers["location"]
+
+    own_page = first_browser.get(first_url)
+    assert own_page.status_code == 200
+    assert "+855386334567" in own_page.text
+
+    other_page = first_browser.get(second_url)
+    assert other_page.status_code == 404
+    assert "+855386345678" not in other_page.text
+
+    other_poll = first_browser.get(f"{second_url}/poll")
+    assert other_poll.status_code == 404
+    assert "654321" not in other_poll.text
+
+
 def test_public_pages_do_not_expose_admin_entry(tmp_path):
     app = make_test_app(tmp_path, FakeSmsClient())
     client = TestClient(app)

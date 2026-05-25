@@ -15,7 +15,7 @@ from app.repositories import (
     OrderRepository,
     normalize_cdk,
 )
-from app.security import SessionManager, credentials_match
+from app.security import OrderAccessManager, SessionManager, credentials_match
 from app.services.redeem import InvalidCdkError, OrderNotFoundError, RedeemService
 from app.services.smsverify import SmsverifyClient
 
@@ -90,6 +90,7 @@ def create_app(
         number_prefixes=number_prefixes if number_prefixes is not None else settings.number_prefixes,
     )
     sessions = SessionManager(resolved_session_secret)
+    order_access = OrderAccessManager(resolved_session_secret)
 
     app.state.connection = connection
 
@@ -153,10 +154,14 @@ def create_app(
                 error=PUBLIC_ORDER_ERROR,
                 code=normalized,
             )
-        return RedirectResponse(f"/orders/{order['public_token']}", status_code=303)
+        response = RedirectResponse(f"/orders/{order['public_token']}", status_code=303)
+        order_access.grant(response, request, public_token=order["public_token"])
+        return response
 
     @app.get("/orders/{order_token}", response_class=HTMLResponse)
     def order_page(request: Request, order_token: str):
+        if not order_access.has_access(request, public_token=order_token):
+            return render("redeem/not_found.html", request, status_code=404)
         order = order_repo.get_by_public_token(order_token)
         if order is None:
             return render("redeem/not_found.html", request, status_code=404)
@@ -164,6 +169,8 @@ def create_app(
 
     @app.get("/orders/{order_token}/poll", response_class=HTMLResponse)
     def order_poll(request: Request, order_token: str):
+        if not order_access.has_access(request, public_token=order_token):
+            return render("redeem/_order_status.html", request, status_code=404, order=None)
         order = order_repo.get_by_public_token(order_token)
         if order is None:
             return render("redeem/_order_status.html", request, status_code=404, order=None)
